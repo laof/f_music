@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:audio_session/audio_session.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
@@ -7,6 +10,9 @@ import 'common.dart';
 import 'package:rxdart/rxdart.dart';
 
 import 'search.dart';
+
+var cc = Uri.parse(
+    "https://media.wnyc.org/i/1400/1400/l/80/1/ScienceFriday_WNYCStudios_1400.jpg");
 
 Future<void> main() async {
   await JustAudioBackground.init(
@@ -30,12 +36,15 @@ class _MyAppState extends State<MyApp> {
   late AudioPlayer _player;
   int _addedCount = 0;
 
+  final _playlist = ConcatenatingAudioSource(children: []);
+
   @override
   void initState() {
     super.initState();
     _player = AudioPlayer();
+
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-      statusBarColor: Colors.black,
+      statusBarColor: Colors.red,
     ));
     _init();
   }
@@ -48,6 +57,14 @@ class _MyAppState extends State<MyApp> {
         onError: (Object e, StackTrace stackTrace) {
       print('A stream error occurred: $e');
     });
+
+    try {
+      await _player.setAudioSource(_playlist);
+    } catch (e, stackTrace) {
+      // Catch load errors: 404, invalid url ...
+      print("Error loading playlist: $e");
+      print(stackTrace);
+    }
   }
 
   @override
@@ -56,16 +73,7 @@ class _MyAppState extends State<MyApp> {
     super.dispose();
   }
 
-  create(String url) async {
-    try {
-      await _player.setAudioSource(AudioSource.uri(Uri.parse(url)));
-      _player.play();
-    } catch (e) {
-      print("Error loading audio source: $e");
-    }
-  }
-
-  void _play(String token, name) async {
+  void _play(String token, name, author) async {
     setState(() {
       _status = "加載 $name ..";
     });
@@ -79,7 +87,27 @@ class _MyAppState extends State<MyApp> {
       return;
     }
 
-    await create(url);
+    try {
+      // await _player.setAudioSource(AudioSource.uri(Uri.parse(url)));
+      // _player.play();
+
+      await _playlist.add(AudioSource.uri(Uri.parse(url),
+          tag: MediaItem(
+            id: '${_nextMediaId++}',
+            album: author,
+            title: name,
+            artUri: cc,
+          )));
+
+      if (_player.playing) {
+        _player.seekToNext();
+        // _player.seek(Duration.zero, index: _nextMediaId);
+      } else {
+        _player.play();
+      }
+    } catch (e) {
+      print("Error loading audio source: $e");
+    }
 
     setState(() {
       _status = name;
@@ -98,12 +126,53 @@ class _MyAppState extends State<MyApp> {
     List<Widget> arr = [];
 
     res.forEach((obj) {
-      arr.add(TextButton(
-        onPressed: () {
-          _play(obj["token"], obj["name"]);
-        },
-        child: Text(obj["name"]),
-      ));
+      var txt = "${obj["index"] + 1} ${obj["name"]}";
+
+      var item = Row(children: [
+        Expanded(
+            flex: 2,
+            child: Row(
+              children: [
+                InkWell(
+                    child: Container(
+                      padding: const EdgeInsets.only(
+                        bottom: 5,
+                        top: 5,
+                      ),
+                      child: Text(
+                        txt,
+                        style: const TextStyle(
+                          color: Colors.blueAccent,
+                        ),
+                        softWrap: true,
+                      ),
+                    ),
+                    onTap: () {
+                      _play(obj["token"], obj["name"], obj["author"]);
+                    }),
+                Expanded(
+                  child: Text(''),
+                )
+              ],
+            )),
+        Expanded(
+            flex: 1,
+            child: Text(
+              obj["author"],
+              textAlign: TextAlign.right,
+              style: const TextStyle(
+                color: Colors.grey,
+              ),
+              softWrap: true,
+            )),
+      ]);
+
+      var padding = Padding(
+        padding: const EdgeInsets.only(top: 6, bottom: 6),
+        child: item,
+      );
+
+      arr.add(padding);
     });
     setState(() {
       list = arr;
@@ -122,11 +191,14 @@ class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      color: Colors.red,
+      theme: ThemeData(primarySwatch: Colors.red),
       debugShowCheckedModeBanner: false,
       home: Scaffold(
           body: GestureDetector(
               behavior: HitTestBehavior.translucent,
               onTap: () {
+                // FocusScope.of(context).unfocus();
                 FocusScope.of(context).requestFocus(FocusNode());
               },
               child: Center(
@@ -144,6 +216,7 @@ class _MyAppState extends State<MyApp> {
                             Padding(
                               padding: const EdgeInsets.only(top: 1, bottom: 1),
                               child: TextField(
+                                autofocus: false,
                                 decoration: const InputDecoration(
                                     hintStyle: TextStyle(fontSize: 16),
                                     hintText: '请输入'),
@@ -197,9 +270,10 @@ class _MyAppState extends State<MyApp> {
                                         snapshot.data ?? LoopMode.off;
                                     const icons = [
                                       Icon(Icons.repeat, color: Colors.grey),
-                                      Icon(Icons.repeat, color: Colors.orange),
+                                      Icon(Icons.repeat,
+                                          color: Colors.blueAccent),
                                       Icon(Icons.repeat_one,
-                                          color: Colors.orange),
+                                          color: Colors.blueAccent),
                                     ];
                                     const cycleModes = [
                                       LoopMode.off,
@@ -231,7 +305,7 @@ class _MyAppState extends State<MyApp> {
                                     return IconButton(
                                       icon: shuffleModeEnabled
                                           ? const Icon(Icons.shuffle,
-                                              color: Colors.orange)
+                                              color: Colors.blueAccent)
                                           : const Icon(Icons.shuffle,
                                               color: Colors.grey),
                                       onPressed: () async {
@@ -254,21 +328,6 @@ class _MyAppState extends State<MyApp> {
                     ),
                   ),
                 ),
-                // floatingActionButton: FloatingActionButton(
-                //   child: const Icon(Icons.add),
-                //   onPressed: () {
-                //     _playlist.add(AudioSource.uri(
-                //       Uri.parse("asset:///audio/nature.mp3"),
-                //       tag: MediaItem(
-                //         id: '${_nextMediaId++}',
-                //         album: "Public Domain",
-                //         title: "Nature Sounds ${++_addedCount}",
-                //         artUri: Uri.parse(
-                //             "https://media.wnyc.org/i/1400/1400/l/80/1/ScienceFriday_WNYCStudios_1400.jpg"),
-                //       ),
-                //     ));
-                //   },
-                // ),
               ))),
     );
   }
@@ -285,6 +344,7 @@ class ControlButtons extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         IconButton(
+          iconSize: 16,
           icon: const Icon(Icons.volume_up),
           onPressed: () {
             showSliderDialog(
@@ -311,30 +371,42 @@ class ControlButtons extends StatelessWidget {
             final playerState = snapshot.data;
             final processingState = playerState?.processingState;
             final playing = playerState?.playing;
+
+            // return Container(
+            //   width: 34.0,
+            //   height: 34.0,
+            //   child: Container(
+            //     margin: const EdgeInsets.all(8.0),
+            //     child: const CircularProgressIndicator(strokeWidth:3),
+            //   ),
+            // );
+
             if (processingState == ProcessingState.loading ||
                 processingState == ProcessingState.buffering) {
               return Container(
-                margin: const EdgeInsets.all(8.0),
-                width: 64.0,
-                height: 64.0,
-                child: const CircularProgressIndicator(),
+                width: 34.0,
+                height: 34.0,
+                child: Container(
+                  margin: const EdgeInsets.all(8.0),
+                  child: const CircularProgressIndicator(strokeWidth: 3),
+                ),
               );
             } else if (playing != true) {
               return IconButton(
                 icon: const Icon(Icons.play_arrow),
-                iconSize: 64.0,
+                // iconSize: 34.0,
                 onPressed: player.play,
               );
             } else if (processingState != ProcessingState.completed) {
               return IconButton(
                 icon: const Icon(Icons.pause),
-                iconSize: 64.0,
+                // iconSize: 34.0,
                 onPressed: player.pause,
               );
             } else {
               return IconButton(
                 icon: const Icon(Icons.replay),
-                iconSize: 64.0,
+                // iconSize: 34.0,
                 onPressed: () => player.seek(Duration.zero,
                     index: player.effectiveIndices!.first),
               );

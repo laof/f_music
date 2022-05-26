@@ -9,12 +9,19 @@ Future<List> search(String name) async {
   var url = Uri.parse(str);
   var response = await http.get(url);
   var document = parse(response.body);
-  List list = [];
 
   var ul = document.querySelectorAll(".list li");
 
-  for (var ele in ul) {
-    var author = ele.querySelector("span")?.innerHtml;
+  List list = List.generate(ul.length, (index) {
+    var ele = ul[index];
+    var span = ele.querySelector("span");
+    var author = "";
+
+    if (span != null) {
+      author = span.innerHtml;
+      author = author.replaceAll("&amp;", "&");
+    }
+
     var a = ele.querySelector("a");
     String? token = "";
     String name = "";
@@ -23,12 +30,13 @@ Future<List> search(String name) async {
       token = a.attributes["dates"];
     }
 
-    list.add({
+    return {
+      "index": index,
       "name": name,
       "token": token,
       "author": author,
-    });
-  }
+    };
+  });
 
   return list;
 }
@@ -41,16 +49,15 @@ Future<String> getMP3(token) async {
   var aEle = parse(res.body).querySelector(".downBu.secm3");
   var href = aEle?.attributes["href"];
 
-  if(href==null){
+  if (href == null) {
     return "";
-  } else if(href.startsWith("http")){
+  } else if (href.startsWith("http")) {
     return getJavascriptData(href);
-  } else if(href.startsWith("javascript:")){
+  } else if (href.startsWith("javascript:")) {
     return getHerfData(href);
   }
   return "";
 }
-
 
 Future<String> getJavascriptData(htmlurl) async {
   var spec = "_hello_lova_spec_";
@@ -71,37 +78,33 @@ Future<String> getJavascriptData(htmlurl) async {
   return mp3url.body;
 }
 
-
 // javascript:tps('aHR0cHM6Ly9hbnRpc2VydmVyLmt1d28uY24vYW50aS5zP2Zvcm1hdD1tcDN8YWFjJnJpZD0xMTg5ODAmYnI9MzIwa21wMyZ0eXBlPWNvbnZlcnRfdXJsJnJlc3BvbnNlPXJlcw==');
 Future<String> getHerfData(String funstr) async {
-
   var ref = RegExp("(?<=['|\"]).*(?=['|\"])");
   String? cc = ref.firstMatch(funstr)?.group(0);
-  if (cc== null) {
+  if (cc == null) {
     return "";
   }
   List<int> bytes2 = base64Decode(cc);
-  var url2 =  String.fromCharCodes(bytes2);
+  var url2 = String.fromCharCodes(bytes2);
 
-  http.Request req = http.Request("Get", Uri.parse(url2))..followRedirects = false;
+  http.Request req = http.Request("Get", Uri.parse(url2))
+    ..followRedirects = false;
   http.Client baseClient = http.Client();
   http.StreamedResponse response = await baseClient.send(req);
   var ccccc = response.headers['location'];
   baseClient.close();
 
-  if(ccccc==null){
+  if (ccccc == null) {
     return "";
   }
 
   return ccccc;
-
 }
 
-
-
 // get fdasfa3455gfs2gf323;
-String oldversion(){
-  var str ="call('fdasfa3455gfs2gf323')";
+String oldversion() {
+  var str = "call('fdasfa3455gfs2gf323')";
   var ref = RegExp("(?<=['|\"]).*(?=['|\"])");
   String? cc = ref.firstMatch(str)?.group(0);
   if (cc != null) {
