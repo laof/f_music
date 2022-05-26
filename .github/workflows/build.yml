@@ -1,0 +1,37 @@
+name: F Music CICD
+
+on: push
+
+jobs:
+  build-apk:
+    name: build apk
+    runs-on: ubuntu-latest
+    if: "contains(github.event.head_commit.message, 'cicd:')"
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-java@v2
+        with:
+          distribution: "zulu"
+          java-version: "11"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "2.10.5"
+      - run: flutter --version
+      - run: flutter pub get
+      - run: flutter build apk
+
+      - uses: dart-lang/setup-dart@v1
+      - run: dart --version
+      - run: dart run deploy.dart dart-task
+
+      - uses: JamesIves/github-pages-deploy-action@v4.3.3
+        with:
+          token: ${{ secrets.CDAPK }}
+          folder: output
+          repository-name: laof/blob
+          target-folder: files
+          branch: main
+          clean: false
+          force: false
+          commit-message: cicd:deploy f_music.apk
