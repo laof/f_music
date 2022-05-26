@@ -42,7 +42,6 @@ class _MyAppState extends State<MyApp> {
   void initState() {
     super.initState();
     _player = AudioPlayer();
-
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
       statusBarColor: Colors.red,
     ));
